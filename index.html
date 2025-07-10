@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PH Angkas Padala - Book & Track</title>
+  <title>PH Angkas Padala - Complete System</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
@@ -26,13 +26,10 @@
     .logo i.material-icons { font-size: 2rem; }
     
     #app { flex-grow: 1; display: flex; flex-direction: column; }
-    main { flex-grow: 1; display: flex; flex-direction: column; }
     
-    #map { 
-      flex-grow: 1; 
-      min-height: 400px; 
-      z-index: 1;
-    }
+    /* Map Container */
+    #map-container { flex-grow: 1; position: relative; }
+    #map { height: 100%; width: 100%; }
     
     /* Booking Panel */
     #booking-panel {
@@ -44,7 +41,7 @@
       padding: 16px;
       border-radius: 8px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      width: 300px;
+      width: 320px;
       max-width: 90%;
     }
     
@@ -52,6 +49,9 @@
       color: #dc2626;
       margin-bottom: 12px;
       font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
     
     .form-group {
@@ -65,12 +65,22 @@
       color: #334155;
     }
     
-    .form-group input {
+    .form-group input, .form-group select {
       width: 100%;
       padding: 8px 12px;
       border: 1px solid #cbd5e1;
       border-radius: 6px;
       font-family: 'Inter', sans-serif;
+    }
+    
+    #fare-display {
+      background: #f0fdf4;
+      padding: 8px;
+      border-radius: 6px;
+      margin: 10px 0;
+      text-align: center;
+      font-weight: bold;
+      color: #166534;
     }
     
     #book-btn {
@@ -83,6 +93,10 @@
       font-weight: bold;
       cursor: pointer;
       margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
     
     #book-btn:hover {
@@ -100,9 +114,11 @@
       padding: 10px;
       border-radius: 8px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      display: flex;
+      gap: 10px;
     }
     
-    #trackBtn {
+    .control-btn {
       background: #fbbf24;
       color: #dc2626;
       border: none;
@@ -115,11 +131,57 @@
       gap: 5px;
     }
     
-    #trackBtn:hover {
+    .control-btn:hover {
       background: #dc2626;
       color: white;
     }
     
+    /* Dashboard Views */
+    #admin-dashboard, #driver-dashboard {
+      display: none;
+      position: absolute;
+      top: 80px;
+      left: 20px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 16px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      width: 320px;
+      max-width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    
+    .booking-card {
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+      border-left: 4px solid #fbbf24;
+    }
+    
+    .booking-card h4 {
+      color: #dc2626;
+      margin-bottom: 5px;
+    }
+    
+    .driver-card {
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+      border-left: 4px solid #60a5fa;
+    }
+    
+    /* Icons and animations */
     .pulse-icon {
       background: #dc2626;
       border-radius: 50%;
@@ -133,8 +195,31 @@
       100% { transform: scale(3); opacity: 0; }
     }
     
-    .leaflet-popup-content {
-      font-family: 'Inter', sans-serif;
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Status messages */
+    #status {
+      position: absolute;
+      bottom: 80px;
+      left: 20px;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      max-width: 80%;
     }
   </style>
 </head>
@@ -144,39 +229,111 @@
       <i class="material-icons" aria-hidden="true">motorcycle</i>
       <span>PH Angkas Padala</span>
     </div>
+    <div>
+      <button id="admin-btn" class="control-btn" style="display:none;">
+        <i class="material-icons">admin_panel_settings</i>
+      </button>
+      <button id="driver-btn" class="control-btn" style="display:none;">
+        <i class="material-icons">two_wheeler</i>
+      </button>
+    </div>
   </header>
   
   <div id="app">
-    <main>
+    <div id="map-container">
       <div id="map"></div>
       
       <!-- Booking Panel -->
       <div id="booking-panel">
-        <h2>Book a Ride</h2>
+        <h2><i class="material-icons">directions_bike</i> Book a Ride</h2>
         <form id="booking-form">
           <div class="form-group">
             <label for="pickup">Pickup Location</label>
-            <input type="text" id="pickup" placeholder="Enter pickup address">
+            <input type="text" id="pickup" placeholder="Enter pickup address" required>
           </div>
           <div class="form-group">
             <label for="destination">Destination</label>
-            <input type="text" id="destination" placeholder="Enter destination">
+            <input type="text" id="destination" placeholder="Enter destination" required>
           </div>
+          <div class="form-group">
+            <label for="vehicle-type">Vehicle Type</label>
+            <select id="vehicle-type">
+              <option value="standard">Standard Motorcycle</option>
+              <option value="premium">Premium Motorcycle</option>
+            </select>
+          </div>
+          <div id="fare-display">Estimated Fare: ₱0.00</div>
           <button type="submit" id="book-btn">
             <i class="material-icons">directions_bike</i>
-            Book Now
+            <span>Book Now</span>
           </button>
         </form>
       </div>
       
-      <!-- GPS Controls -->
+      <!-- Admin Dashboard -->
+      <div id="admin-dashboard">
+        <div class="dashboard-header">
+          <h2><i class="material-icons">admin_panel_settings</i> Admin Dashboard</h2>
+          <button id="close-admin" class="control-btn" style="padding: 4px 8px;">
+            <i class="material-icons">close</i>
+          </button>
+        </div>
+        
+        <h3>Manage Drivers</h3>
+        <form id="add-driver-form">
+          <div class="form-group">
+            <label for="driver-name">Driver Name</label>
+            <input type="text" id="driver-name" placeholder="Driver name" required>
+          </div>
+          <div class="form-group">
+            <label for="driver-vehicle">Vehicle</label>
+            <input type="text" id="driver-vehicle" placeholder="Vehicle details" required>
+          </div>
+          <button type="submit" class="control-btn" style="width:100%;">
+            <i class="material-icons">person_add</i> Add Driver
+          </button>
+        </form>
+        
+        <h3 style="margin-top:20px;">Active Drivers</h3>
+        <div id="drivers-list"></div>
+        
+        <h3>Recent Bookings</h3>
+        <div id="bookings-list"></div>
+      </div>
+      
+      <!-- Driver Dashboard -->
+      <div id="driver-dashboard">
+        <div class="dashboard-header">
+          <h2><i class="material-icons">two_wheeler</i> Driver Dashboard</h2>
+          <button id="close-driver" class="control-btn" style="padding: 4px 8px;">
+            <i class="material-icons">close</i>
+          </button>
+        </div>
+        
+        <div id="driver-info">
+          <h3>Your Assignments</h3>
+          <div id="current-assignment"></div>
+          
+          <h3 style="margin-top:20px;">Available Bookings</h3>
+          <div id="available-bookings"></div>
+        </div>
+      </div>
+      
+      <!-- Controls -->
       <div id="controls">
-        <button id="trackBtn">
+        <button id="track-btn" class="control-btn">
           <i class="material-icons">my_location</i>
           <span>Start Tracking</span>
         </button>
+        <button id="location-btn" class="control-btn">
+          <i class="material-icons">place</i>
+          <span>Set Location</span>
+        </button>
       </div>
-    </main>
+      
+      <!-- Status Message -->
+      <div id="status"></div>
+    </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -190,23 +347,127 @@
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(map);
       
-      // Create tracking elements
+      // Initialize database in localStorage
+      if (!localStorage.getItem('angkasDrivers')) {
+        localStorage.setItem('angkasDrivers', JSON.stringify([]));
+      }
+      
+      if (!localStorage.getItem('angkasBookings')) {
+        localStorage.setItem('angkasBookings', JSON.stringify([]));
+      }
+      
+      // DOM elements
+      const trackBtn = document.getElementById('track-btn');
+      const locationBtn = document.getElementById('location-btn');
+      const adminBtn = document.getElementById('admin-btn');
+      const driverBtn = document.getElementById('driver-btn');
+      const bookingForm = document.getElementById('booking-form');
+      const addDriverForm = document.getElementById('add-driver-form');
+      const adminDashboard = document.getElementById('admin-dashboard');
+      const driverDashboard = document.getElementById('driver-dashboard');
+      const fareDisplay = document.getElementById('fare-display');
+      const statusEl = document.getElementById('status');
+      
+      // Application state
       let userMarker = null;
       let watchId = null;
       const pathPoints = [];
       let pathPolyline = L.polyline([], {color: '#dc2626'}).addTo(map);
+      let currentUserRole = null; // 'admin', 'driver', or null (customer)
+      let currentDriverId = null;
       
-      // DOM elements
-      const trackBtn = document.getElementById('trackBtn');
-      const trackText = trackBtn.querySelector('span');
-      const trackIcon = trackBtn.querySelector('i');
-      const bookingForm = document.getElementById('booking-form');
+      // Base fare rates
+      const fareRates = {
+        standard: {
+          base: 50,
+          perKm: 10,
+          perMin: 2,
+          minFare: 50
+        },
+        premium: {
+          base: 80,
+          perKm: 15,
+          perMin: 3,
+          minFare: 80
+        }
+      };
       
-      // Tracking function
+      // Check for admin/driver mode in URL
+      checkUserRole();
+      
+      // Initialize the application
+      initEventListeners();
+      updateFareEstimate();
+      
+      // Check URL for role parameter
+      function checkUserRole() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const role = urlParams.get('role');
+        
+        if (role === 'admin') {
+          enableAdminMode();
+        } else if (role === 'driver') {
+          const driverId = urlParams.get('id');
+          enableDriverMode(driverId);
+        }
+      }
+      
+      // Enable admin mode
+      function enableAdminMode() {
+        currentUserRole = 'admin';
+        adminBtn.style.display = 'inline-flex';
+        driverBtn.style.display = 'none';
+        document.getElementById('booking-panel').style.display = 'none';
+        showAdminDashboard();
+        loadAdminData();
+      }
+      
+      // Enable driver mode
+      function enableDriverMode(driverId) {
+        currentUserRole = 'driver';
+        currentDriverId = driverId;
+        adminBtn.style.display = 'none';
+        driverBtn.style.display = 'inline-flex';
+        document.getElementById('booking-panel').style.display = 'none';
+        showDriverDashboard();
+        loadDriverData();
+      }
+      
+      // Initialize event listeners
+      function initEventListeners() {
+        // Tracking controls
+        trackBtn.addEventListener('click', toggleTracking);
+        locationBtn.addEventListener('click', setManualLocation);
+        
+        // Dashboard controls
+        adminBtn.addEventListener('click', showAdminDashboard);
+        driverBtn.addEventListener('click', showDriverDashboard);
+        document.getElementById('close-admin').addEventListener('click', hideAdminDashboard);
+        document.getElementById('close-driver').addEventListener('click', hideDriverDashboard);
+        
+        // Form submissions
+        bookingForm.addEventListener('submit', handleBooking);
+        addDriverForm.addEventListener('submit', addDriver);
+        
+        // Fare calculation triggers
+        document.getElementById('pickup').addEventListener('input', updateFareEstimate);
+        document.getElementById('destination').addEventListener('input', updateFareEstimate);
+        document.getElementById('vehicle-type').addEventListener('change', updateFareEstimate);
+      }
+      
+      // Toggle GPS tracking
+      function toggleTracking() {
+        if (watchId) {
+          stopTracking();
+        } else {
+          startTracking();
+        }
+      }
+      
+      // Start GPS tracking
       function startTracking() {
         if (navigator.geolocation) {
-          trackText.textContent = 'Tracking...';
-          trackIcon.textContent = 'gps_fixed';
+          trackBtn.innerHTML = '<i class="material-icons">gps_fixed</i><span>Tracking...</span>';
           trackBtn.style.background = '#dc2626';
           trackBtn.style.color = 'white';
           
@@ -215,66 +476,82 @@
               const { latitude, longitude } = position.coords;
               const accuracy = position.coords.accuracy;
               
-              // Update or create marker
-              if (!userMarker) {
-                userMarker = L.marker([latitude, longitude], {
-                  icon: L.divIcon({ className: 'pulse-icon' })
-                }).addTo(map);
-                
-                userMarker.bindPopup(`
-                  <b>Your Location</b><br>
-                  Accuracy: ${Math.round(accuracy)} meters
-                `).openPopup();
-                
-                // Auto-fill pickup location if empty
-                if (!document.getElementById('pickup').value) {
-                  reverseGeocode(latitude, longitude, (address) => {
-                    document.getElementById('pickup').value = address;
-                  });
-                }
-              } else {
-                userMarker.setLatLng([latitude, longitude]);
-                userMarker.setPopupContent(`
-                  <b>Your Location</b><br>
-                  Accuracy: ${Math.round(accuracy)} meters
-                `);
+              updateUserPosition(latitude, longitude, accuracy);
+              
+              // If in driver mode, update driver's position
+              if (currentUserRole === 'driver') {
+                updateDriverPosition(currentDriverId, latitude, longitude);
               }
-              
-              // Update path
-              pathPoints.push([latitude, longitude]);
-              pathPolyline.setLatLngs(pathPoints);
-              
-              // Center map
-              map.setView([latitude, longitude], 16);
             },
             error => {
-              console.error("GPS Error:", error);
-              alert(`GPS Error: ${error.message}`);
+              showStatus(`GPS Error: ${error.message}`, 'error');
               stopTracking();
             },
-            {
-              enableHighAccuracy: true,
-              maximumAge: 0,
-              timeout: 5000
-            }
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
           );
         } else {
-          alert("Geolocation is not supported by your browser.");
+          showStatus("Geolocation is not supported by your browser.", 'error');
         }
       }
       
+      // Stop GPS tracking
       function stopTracking() {
         if (watchId) {
           navigator.geolocation.clearWatch(watchId);
           watchId = null;
         }
-        trackText.textContent = 'Start Tracking';
-        trackIcon.textContent = 'my_location';
+        trackBtn.innerHTML = '<i class="material-icons">my_location</i><span>Start Tracking</span>';
         trackBtn.style.background = '#fbbf24';
         trackBtn.style.color = '#dc2626';
       }
       
-      // Reverse geocode function
+      // Set manual location (for demo/testing)
+      function setManualLocation() {
+        const lat = prompt("Enter latitude:", "14.5995");
+        const lng = prompt("Enter longitude:", "120.9842");
+        
+        if (lat && lng) {
+          updateUserPosition(parseFloat(lat), parseFloat(lng), 50);
+        }
+      }
+      
+      // Update user position on map
+      function updateUserPosition(lat, lng, accuracy) {
+        // Update or create marker
+        if (!userMarker) {
+          userMarker = L.marker([lat, lng], {
+            icon: L.divIcon({ className: 'pulse-icon' })
+          }).addTo(map);
+          
+          userMarker.bindPopup(`
+            <b>Your Location</b><br>
+            Accuracy: ${Math.round(accuracy)} meters
+          `).openPopup();
+          
+          // Auto-fill pickup location if empty
+          if (!document.getElementById('pickup').value) {
+            reverseGeocode(lat, lng, (address) => {
+              document.getElementById('pickup').value = address;
+              updateFareEstimate();
+            });
+          }
+        } else {
+          userMarker.setLatLng([lat, lng]);
+          userMarker.setPopupContent(`
+            <b>Your Location</b><br>
+            Accuracy: ${Math.round(accuracy)} meters
+          `);
+        }
+        
+        // Update path
+        pathPoints.push([lat, lng]);
+        pathPolyline.setLatLngs(pathPoints);
+        
+        // Center map
+        map.setView([lat, lng], 16);
+      }
+      
+      // Reverse geocode coordinates to address
       function reverseGeocode(lat, lng, callback) {
         fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
           .then(response => response.json())
@@ -285,39 +562,417 @@
           .catch(() => callback("Current Location"));
       }
       
-      // Handle booking form submission
-      bookingForm.addEventListener('submit', function(e) {
+      // Calculate route and fare estimate
+      function updateFareEstimate() {
+        const pickup = document.getElementById('pickup').value;
+        const destination = document.getElementById('destination').value;
+        const vehicleType = document.getElementById('vehicle-type').value;
+        
+        if (!pickup || !destination) {
+          fareDisplay.textContent = "Estimated Fare: ₱0.00";
+          return;
+        }
+        
+        // For demo purposes, we'll simulate a fare calculation
+        // In a real app, you would use a routing service
+        const rates = fareRates[vehicleType];
+        const distance = 3 + Math.random() * 10; // Random distance 3-13 km
+        const duration = 10 + Math.random() * 30; // Random duration 10-40 min
+        
+        const distanceFare = Math.max(0, distance - 2) * rates.perKm;
+        const timeFare = duration * rates.perMin;
+        let fare = rates.base + distanceFare + timeFare;
+        fare = Math.max(fare, rates.minFare);
+        fare = Math.round(fare / 5) * 5; // Round to nearest 5
+        
+        fareDisplay.textContent = `Estimated Fare: ₱${fare.toFixed(2)}`;
+      }
+      
+      // Handle booking submission
+      function handleBooking(e) {
         e.preventDefault();
         
         const pickup = document.getElementById('pickup').value;
         const destination = document.getElementById('destination').value;
+        const vehicleType = document.getElementById('vehicle-type').value;
         
         if (!pickup || !destination) {
-          alert('Please enter both pickup and destination locations');
+          showStatus('Please enter both pickup and destination locations', 'error');
           return;
         }
         
-        // In a real app, you would send this to your backend
-        alert(`Booking requested!\nFrom: ${pickup}\nTo: ${destination}`);
+        const bookBtn = document.getElementById('book-btn');
+        bookBtn.innerHTML = '<span class="spinner"></span> Finding Driver...';
+        bookBtn.disabled = true;
         
-        // Reset form
-        bookingForm.reset();
-      });
+        // Create booking object
+        const booking = {
+          id: Date.now().toString(),
+          pickup,
+          destination,
+          vehicleType,
+          fare: fareDisplay.textContent.replace('Estimated Fare: ', ''),
+          status: 'pending',
+          timestamp: new Date().toISOString(),
+          customerLocation: userMarker ? userMarker.getLatLng() : null
+        };
+        
+        // Save booking to "database"
+        const bookings = JSON.parse(localStorage.getItem('angkasBookings'));
+        bookings.push(booking);
+        localStorage.setItem('angkasBookings', JSON.stringify(bookings));
+        
+        // Find nearest available driver
+        setTimeout(() => {
+          const assignedDriver = assignDriver(booking);
+          
+          if (assignedDriver) {
+            // Update booking status
+            booking.status = 'assigned';
+            booking.driverId = assignedDriver.id;
+            booking.driverName = assignedDriver.name;
+            booking.driverVehicle = assignedDriver.vehicle;
+            localStorage.setItem('angkasBookings', JSON.stringify(bookings));
+            
+            showStatus(`Driver assigned: ${assignedDriver.name} (${assignedDriver.vehicle})`, 'success');
+            
+            // Simulate driver moving to pickup
+            simulateDriverMovement(assignedDriver.id, booking);
+          } else {
+            showStatus('No available drivers at the moment', 'error');
+          }
+          
+          bookBtn.innerHTML = '<i class="material-icons">directions_bike</i><span>Book Now</span>';
+          bookBtn.disabled = false;
+          bookingForm.reset();
+        }, 1500);
+      }
       
-      // Toggle tracking
-      trackBtn.addEventListener('click', function() {
-        if (watchId) {
-          stopTracking();
-        } else {
-          startTracking();
+      // Assign a driver to a booking
+      function assignDriver(booking) {
+        const drivers = JSON.parse(localStorage.getItem('angkasDrivers'));
+        const availableDrivers = drivers.filter(d => d.status === 'available');
+        
+        if (availableDrivers.length === 0) return null;
+        
+        // For demo, just pick the first available driver
+        const assignedDriver = availableDrivers[0];
+        
+        // Update driver status
+        assignedDriver.status = 'assigned';
+        assignedDriver.bookingId = booking.id;
+        localStorage.setItem('angkasDrivers', JSON.stringify(drivers));
+        
+        return assignedDriver;
+      }
+      
+      // Simulate driver movement (demo only)
+      function simulateDriverMovement(driverId, booking) {
+        const drivers = JSON.parse(localStorage.getItem('angkasDrivers'));
+        const driver = drivers.find(d => d.id === driverId);
+        
+        if (!driver || !booking.customerLocation) return;
+        
+        // Simulate driver moving toward customer
+        const interval = setInterval(() => {
+          if (!driver.location) {
+            // Start from random nearby position
+            driver.location = {
+              lat: booking.customerLocation.lat + (Math.random() * 0.02 - 0.01),
+              lng: booking.customerLocation.lng + (Math.random() * 0.02 - 0.01)
+            };
+          } else {
+            // Move closer to customer
+            driver.location.lat += (booking.customerLocation.lat - driver.location.lat) * 0.1;
+            driver.location.lng += (booking.customerLocation.lng - driver.location.lng) * 0.1;
+          }
+          
+          localStorage.setItem('angkasDrivers', JSON.stringify(drivers));
+          
+          // Check if driver reached customer
+          const distance = Math.sqrt(
+            Math.pow(booking.customerLocation.lat - driver.location.lat, 2) +
+            Math.pow(booking.customerLocation.lng - driver.location.lng, 2)
+          );
+          
+          if (distance < 0.001) { // ~100 meters
+            clearInterval(interval);
+            driver.status = 'arrived';
+            localStorage.setItem('angkasDrivers', JSON.stringify(drivers));
+            
+            // Update booking status
+            const bookings = JSON.parse(localStorage.getItem('angkasBookings'));
+            const updatedBooking = bookings.find(b => b.id === booking.id);
+            if (updatedBooking) {
+              updatedBooking.status = 'driver_arrived';
+              localStorage.setItem('angkasBookings', JSON.stringify(bookings));
+            }
+          }
+        }, 1000);
+      }
+      
+      // Add a new driver (admin function)
+      function addDriver(e) {
+        e.preventDefault();
+        
+        const name = document.getElementById('driver-name').value;
+        const vehicle = document.getElementById('driver-vehicle').value;
+        
+        if (!name || !vehicle) {
+          showStatus('Please enter both name and vehicle details', 'error');
+          return;
         }
-      });
+        
+        const driver = {
+          id: Date.now().toString(),
+          name,
+          vehicle,
+          status: 'available',
+          location: null
+        };
+        
+        const drivers = JSON.parse(localStorage.getItem('angkasDrivers'));
+        drivers.push(driver);
+        localStorage.setItem('angkasDrivers', JSON.stringify(drivers));
+        
+        showStatus(`Driver ${name} added successfully`, 'success');
+        addDriverForm.reset();
+        loadAdminData();
+      }
       
-      // Add attribution
-      L.control.attribution({
-        position: 'bottomright',
-        prefix: '<a href="https://leafletjs.com/">Leaflet</a> | PH Angkas Padala'
-      }).addTo(map);
+      // Update driver position (for driver mode)
+      function updateDriverPosition(driverId, lat, lng) {
+        const drivers = JSON.parse(localStorage.getItem('angkasDrivers'));
+        const driver = drivers.find(d => d.id === driverId);
+        
+        if (driver) {
+          driver.location = { lat, lng };
+          localStorage.setItem('angkasDrivers', JSON.stringify(drivers));
+        }
+      }
+      
+      // Show admin dashboard
+      function showAdminDashboard() {
+        adminDashboard.style.display = 'block';
+        driverDashboard.style.display = 'none';
+        loadAdminData();
+      }
+      
+      // Hide admin dashboard
+      function hideAdminDashboard() {
+        adminDashboard.style.display = 'none';
+      }
+      
+      // Show driver dashboard
+      function showDriverDashboard() {
+        driverDashboard.style.display = 'block';
+        adminDashboard.style.display = 'none';
+        loadDriverData();
+      }
+      
+      // Hide driver dashboard
+      function hideDriverDashboard() {
+        driverDashboard.style.display = 'none';
+      }
+      
+      // Load admin data
+      function loadAdminData() {
+        const drivers = JSON.parse(localStorage.getItem('angkasDrivers'));
+        const bookings = JSON.parse(localStorage.getItem('angkasBookings'));
+        
+        // Display drivers
+        const driversList = document.getElementById('drivers-list');
+        driversList.innerHTML = '';
+        
+        drivers.forEach(driver => {
+          const driverCard = document.createElement('div');
+          driverCard.className = 'driver-card';
+          driverCard.innerHTML = `
+            <h4>${driver.name}</h4>
+            <p>${driver.vehicle}</p>
+            <p>Status: <strong>${driver.status}</strong></p>
+            ${driver.location ? 
+              `<p>Location: ${driver.location.lat.toFixed(4)}, ${driver.location.lng.toFixed(4)}</p>` : 
+              '<p>Location: Unknown</p>'}
+          `;
+          driversList.appendChild(driverCard);
+        });
+        
+        // Display bookings
+        const bookingsList = document.getElementById('bookings-list');
+        bookingsList.innerHTML = '';
+        
+        bookings.slice().reverse().forEach(booking => {
+          const bookingCard = document.createElement('div');
+          bookingCard.className = 'booking-card';
+          bookingCard.innerHTML = `
+            <h4>Booking #${booking.id.slice(-4)}</h4>
+            <p>From: ${booking.pickup}</p>
+            <p>To: ${booking.destination}</p>
+            <p>Fare: ${booking.fare}</p>
+            <p>Status: <strong>${booking.status}</strong></p>
+            ${booking.driverName ? `<p>Driver: ${booking.driverName}</p>` : ''}
+          `;
+          bookingsList.appendChild(bookingCard);
+        });
+      }
+      
+      // Load driver data
+      function loadDriverData() {
+        const drivers = JSON.parse(localStorage.getItem('angkasDrivers'));
+        const bookings = JSON.parse(localStorage.getItem('angkasBookings'));
+        const driver = drivers.find(d => d.id === currentDriverId);
+        
+        if (!driver) return;
+        
+        // Display current assignment
+        const currentAssignment = document.getElementById('current-assignment');
+        currentAssignment.innerHTML = '';
+        
+        if (driver.status === 'assigned' || driver.status === 'arrived') {
+          const booking = bookings.find(b => b.id === driver.bookingId);
+          if (booking) {
+            const assignmentCard = document.createElement('div');
+            assignmentCard.className = 'booking-card';
+            assignmentCard.innerHTML = `
+              <h4>Current Assignment</h4>
+              <p>From: ${booking.pickup}</p>
+              <p>To: ${booking.destination}</p>
+              <p>Fare: ${booking.fare}</p>
+              <p>Status: <strong>${booking.status}</strong></p>
+              <button id="complete-btn" class="control-btn" style="width:100%;margin-top:8px;">
+                <i class="material-icons">check_circle</i> Mark Complete
+              </button>
+            `;
+            currentAssignment.appendChild(assignmentCard);
+            
+            document.getElementById('complete-btn').addEventListener('click', () => {
+              completeBooking(booking.id);
+            });
+          }
+        } else {
+          currentAssignment.innerHTML = '<p>No current assignments</p>';
+        }
+        
+        // Display available bookings
+        const availableBookings = document.getElementById('available-bookings');
+        availableBookings.innerHTML = '';
+        
+        const pendingBookings = bookings.filter(b => b.status === 'pending');
+        
+        if (pendingBookings.length > 0) {
+          pendingBookings.slice().reverse().forEach(booking => {
+            const bookingCard = document.createElement('div');
+            bookingCard.className = 'booking-card';
+            bookingCard.innerHTML = `
+              <h4>Booking #${booking.id.slice(-4)}</h4>
+              <p>From: ${booking.pickup}</p>
+              <p>To: ${booking.destination}</p>
+              <p>Fare: ${booking.fare}</p>
+              ${driver.status === 'available' ? 
+                `<button class="control-btn accept-btn" data-booking="${booking.id}" style="width:100%;margin-top:8px;">
+                  <i class="material-icons">directions_bike</i> Accept
+                </button>` : 
+                '<p>Not available to accept</p>'}
+            `;
+            availableBookings.appendChild(bookingCard);
+          });
+          
+          // Add event listeners to accept buttons
+          document.querySelectorAll('.accept-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+              acceptBooking(this.getAttribute('data-booking'));
+            });
+          });
+        } else {
+          availableBookings.innerHTML = '<p>No available bookings</p>';
+        }
+      }
+      
+      // Complete a booking (driver function)
+      function completeBooking(bookingId) {
+        const bookings = JSON.parse(localStorage.getItem('angkasBookings'));
+        const booking = bookings.find(b => b.id === bookingId);
+        
+        if (booking) {
+          booking.status = 'completed';
+          localStorage.setItem('angkasBookings', JSON.stringify(bookings));
+        }
+        
+        const drivers = JSON.parse(localStorage.getItem('angkasDrivers'));
+        const driver = drivers.find(d => d.id === currentDriverId);
+        
+        if (driver) {
+          driver.status = 'available';
+          driver.bookingId = null;
+          localStorage.setItem('angkasDrivers', JSON.stringify(drivers));
+        }
+        
+        showStatus('Booking marked as completed', 'success');
+        loadDriverData();
+      }
+      
+      // Accept a booking (driver function)
+      function acceptBooking(bookingId) {
+        const bookings = JSON.parse(localStorage.getItem('angkasBookings'));
+        const booking = bookings.find(b => b.id === bookingId);
+        
+        if (!booking) return;
+        
+        const drivers = JSON.parse(localStorage.getItem('angkasDrivers'));
+        const driver = drivers.find(d => d.id === currentDriverId);
+        
+        if (driver && driver.status === 'available') {
+          // Update booking
+          booking.status = 'assigned';
+          booking.driverId = driver.id;
+          booking.driverName = driver.name;
+          booking.driverVehicle = driver.vehicle;
+          localStorage.setItem('angkasBookings', JSON.stringify(bookings));
+          
+          // Update driver
+          driver.status = 'assigned';
+          driver.bookingId = booking.id;
+          localStorage.setItem('angkasDrivers', JSON.stringify(drivers));
+          
+          showStatus(`You've accepted booking #${bookingId.slice(-4)}`, 'success');
+          loadDriverData();
+          
+          // Simulate movement to customer
+          if (booking.customerLocation) {
+            simulateDriverMovement(driver.id, booking);
+          }
+        }
+      }
+      
+      // Show status message
+      function showStatus(message, type = 'info') {
+        statusEl.textContent = message;
+        statusEl.style.display = 'block';
+        statusEl.style.background = type === 'error' ? 'rgba(239, 68, 68, 0.8)' : 
+                                  type === 'success' ? 'rgba(34, 197, 94, 0.8)' : 
+                                  'rgba(0, 0, 0, 0.7)';
+        
+        setTimeout(() => {
+          statusEl.style.display = 'none';
+        }, 5000);
+      }
+      
+      // Initialize with some demo drivers if none exist
+      function initializeDemoData() {
+        const drivers = JSON.parse(localStorage.getItem('angkasDrivers'));
+        if (drivers.length === 0) {
+          const demoDrivers = [
+            { id: 'driver1', name: 'Juan Dela Cruz', vehicle: 'Honda Beat', status: 'available', location: null },
+            { id: 'driver2', name: 'Pedro Santos', vehicle: 'Yamaha Mio', status: 'available', location: null },
+            { id: 'driver3', name: 'Maria Reyes', vehicle: 'Suzuki Skydrive', status: 'available', location: null }
+          ];
+          localStorage.setItem('angkasDrivers', JSON.stringify(demoDrivers));
+        }
+      }
+      
+      // Initialize demo data
+      initializeDemoData();
     });
   </script>
 </body>
