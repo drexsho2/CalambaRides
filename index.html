@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="csrf-token" content="YOUR_CSRF_TOKEN_HERE" />
+<title>PH Angkas Padala</title>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./libs/leaflet.css" />
+<style>
+  /* All CSS is included here */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body, #app { height: 100%; font-family: 'Inter', sans-serif; background: linear-gradient(135deg, #facc15, #dc2626); color: #1e293b; }
+  body { display: flex; flex-direction: column; min-height: 100vh; }
+  header { background: linear-gradient(135deg, #dc2626, #fbbf24); color: white; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: 1.5rem; position: sticky; top: 0; z-index: 10000; box-shadow: 0 4px 12px rgb(220 38 38 / 0.4); }
+  header .logo { display: flex; align-items: center; gap: 8px; }
+  header .logo i.material-icons { font-size: 2rem; }
+  #app { flex-grow: 1; display: flex; flex-direction: column; margin-bottom: 24px; }
+  main { flex-grow: 1; display: flex; flex-direction: column; gap: 16px; padding: 16px; }
+  @media(min-width: 768px) { main { flex-direction: row; padding: 24px 48px; } }
+  #map { flex-grow: 1; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.15); min-height: 320px; touch-action: none; }
+  #booking-panel { background: rgba(255 255 255 / 0.95); border-radius: 16px; padding: 24px; max-width: 400px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 20px; }
+  #booking-panel h2 { font-weight: 700; font-size: 1.5rem; color: #dc2626; margin-bottom: 8px; }
+  #booking-form { display: flex; flex-direction: column; gap: 20px; }
+  .input-wrapper { position: relative; width: 100%; }
+  label { font-weight: 600; margin-bottom: 6px; display: block; color: #334155; }
+  input { padding: 12px 16px; border-radius: 12px; border: 1px solid #cbd5e1; font-size: 1rem; transition: border-color 0.3s ease; width: 100%; }
+  input:focus { outline: none; border-color: #fbbf24; box-shadow: 0 0 8px rgba(251, 191, 36, 0.5); }
+  input.error { border-color: #ef4444; }
+  .error-message { color: #ef4444; font-size: 0.8rem; margin-top: 4px; display: none; }
+  .pickup-container { display: flex; gap: 8px; align-items: center; }
+  button { background: #fbbf24; color: #dc2626; border: none; font-weight: 700; cursor: pointer; box-shadow: 0 6px 15px rgba(251,191,36,0.6); transition: background 0.3s ease, color 0.3s ease; border-radius: 12px; padding: 12px 16px; font-size: 1rem; user-select: none; }
+  button:hover:not(:disabled) { background: #dc2626; color: white; }
+  button:disabled { background: #fcd34d; cursor: not-allowed; box-shadow: none; color: #a16207; }
+  #book-btn { width: 100%; margin-top: 8px; position: relative; }
+  #use-location-btn { min-width: 44px; padding: 0 12px; background: #dc2626; color: white; display: flex; align-items: center; justify-content: center; border-radius: 12px; }
+  #use-location-btn:disabled { background: #f87171; cursor: not-allowed; }
+  #use-location-btn i.material-icons { font-size: 24px; }
+  #status { font-size: 1rem; color: #334155; font-weight: 600; min-height: 24px; min-width: 100%; word-break: break-word; white-space: pre-wrap; }
+  .leaflet-container { background: #f0f0f0; } 
+  .autocomplete-items { position: absolute; border: 1px solid #cbd5e1; z-index: 9999; max-height: 180px; overflow-y: auto; border-radius: 8px; box-shadow: 0 3px 12px rgba(0,0,0,0.15); background-color: #fff; top: 100%; left: 0; right: 0; margin-top: 4px; }
+  .autocomplete-items div { padding: 8px 12px; cursor: pointer; font-size: 0.95rem; color: #334155; border-bottom: 1px solid #f1f5f9; }
+  .autocomplete-items div:last-child { border-bottom: none; }
+  .autocomplete-items div:hover, .autocomplete-items .autocomplete-active { background-color: #dc2626; color: #fff; }
+  #booking-confirmation-modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:100000; display:none; justify-content:center; align-items:center; }
+  #booking-confirmation-modal > div { animation: fadeInScale 0.3s ease-out; background:white; padding:30px; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,0.3); max-width:450px; width:90%; text-align:center; position:relative; }
+  @keyframes fadeInScale { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+  #modal-cancel-btn:hover { background: #b91c1c !important; }
+  footer { text-align: center; padding: 12px 24px; font-size: 0.9rem; color: #b91c1c; }
+  .spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; margin-right: 8px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin { animation: spin 1s linear infinite; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><i class="material-icons" aria-hidden="true">motorcycle</i> PH Angkas Padala</div>
+</header>
+<div id="app">
+  <main>
+    <section id="map" aria-label="Map showing available drivers and routes" tabindex="0"></section>
+    <section id="booking-panel" aria-label="Booking panel">
+      <h2>Book a Ride</h2>
+      <form id="booking-form" aria-describedby="status" novalidate autocomplete="off">
+        <div class="input-wrapper">
+          <label for="pickup">Pick-up Location</label>
+          <div class="pickup-container">
+            <input type="text" id="pickup" name="pickup" placeholder="Enter pick-up address" autocomplete="off" aria-label="Pick-up location" required />
+            <button type="button" id="use-location-btn" aria-label="Use Current Location" title="Use Current Location"><i class="material-icons" aria-hidden="true">my_location</i></button>
+          </div>
+          <div class="error-message" id="pickup-error">Please select a valid pick-up location</div>
+        </div>
+        <div class="input-wrapper">
+          <label for="destination">Destination</label>
+          <input type="text" id="destination" name="destination" placeholder="Enter destination address" autocomplete="off" aria-label="Destination location" required />
+          <div class="error-message" id="destination-error">Please select a valid destination</div>
+        </div>
+        <button type="submit" id="book-btn" disabled>
+          <span id="book-btn-text">Book Now</span>
+        </button>
+      </form>
+      <div id="status" aria-live="polite" role="region" aria-atomic="true"></div>
+    </section>
+  </main>
+</div>
+<div id="booking-confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div tabindex="-1">
+        <h3 id="modal-title" style="color:#dc2626; margin-bottom:20px; font-size:1.6rem;">Confirm Your Ride</h3>
+        <p style="margin-bottom:10px; font-weight:600; color:#334155;">From: <span id="modal-pickup-address" style="font-weight:normal;"></span></p>
+        <p style="margin-bottom:20px; font-weight:600; color:#334155;">To: <span id="modal-destination-address" style="font-weight:normal;"></span></p>
+        <p style="font-size:1.8rem; font-weight:700; color:#fbbf24; margin-bottom:30px;">Estimated Fare: <span id="modal-fare">₱0.00</span></p>
+        <div style="display:flex; justify-content:space-around; gap:15px;">
+          <button id="modal-confirm-btn" style="flex:1; background:#dc2626; color:white; padding:12px 20px;">
+            <span id="confirm-btn-text">Confirm & Book</span>
+          </button>
+          <button id="modal-cancel-btn" style="flex:1; background:#ef4444; color:white; padding:12px 20px;">Cancel</button>
+        </div>
+        <button id="modal-close-btn" style="position:absolute; top:15px; right:15px; background:none; border:none; font-size:1.5rem; color:#6b7280; cursor:pointer;" aria-label="Close modal">&times;</button>
+    </div>
+</div>
+<footer>© 2025 PH Angkas Padala - Demo Only</footer>
+
+<script src="./libs/leaflet.js"></script>
+<script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+
+<script>
+  (function(){
+    "use strict";
+    
+    // Constants
+    const API_BASE_URL = "/api";
+    const PUSHER_KEY = "2145cc5c326a430b3ffa";
+    const PUSHER_CLUSTER = "ap1";
+    const BASE_FARE = 60.00;
+    const SUCCEEDING_KM_RATE = 10.00;
+    const PER_MINUTE_RATE = 2.00;
+    const MINIMUM_FARE = 60.00;
+    const INITIAL_KM_COVERED = 2.0;
+    
+    // DOM Elements
+    const map = L.map("map", { center: [12.8797, 121.7740], zoom: 6, zoomControl: true });
+    const statusEl = document.getElementById("status");
+    const pickupInput = document.getElementById("pickup");
+    const destinationInput = document.getElementById("destination");
+    const bookBtn = document.getElementById("book-btn");
+    const bookingForm = document.getElementById("booking-form");
+    const useLocationBtn = document.getElementById("use-location-btn");
+    const modal = document.getElementById("booking-confirmation-modal");
+    const modalPickupAddress = document.getElementById("modal-pickup-address");
+    const modalDestinationAddress = document.getElementById("modal-destination-address");
+    const modalFare = document.getElementById("modal-fare");
+    const modalConfirmBtn = document.getElementById("modal-confirm-btn");
+    const modalCancelBtn = document.getElementById("modal-cancel-btn");
+    const modalCloseBtn = document.getElementById("modal-close-btn");
+    const pickupError = document.getElementById("pickup-error");
+    const destinationError = document.getElementById("destination-error");
+    const bookBtnText = document.getElementById("book-btn-text");
+    const confirmBtnText = document.getElementById("confirm-btn-text");
+    
+    // Variables
+    let assignedDriverMarker = null;
+    let pickupLatLng = null;
+    let destinationLatLng = null;
+    let routeLayer = null;
+    let userMarkers = [];
+    let driverMarkers = {};
+    let estimatedFareGlobal = 0;
+    let lastFocusedElement = null;
+    let geocodeCache = {};
+    
+    // Icons
+    const pickupIcon = L.icon({ 
+      iconUrl: "https://cdn-icons-png.flaticon.com/512/684/684908.png", 
+      iconSize: [36, 36], 
+      iconAnchor: [18, 36] 
+    });
+    
+    const destinationIcon = L.icon({ 
+      iconUrl: "https://cdn-icons-png.flaticon.com/512/854/854878.png", 
+      iconSize: [36, 36], 
+      iconAnchor: [18, 36] 
+    });
+    
+    const driverIcon = L.icon({ 
+      iconUrl: "https://cdn-icons-png.flaticon.com/512/2972/2972185.png", 
+      iconSize: [36, 36], 
+      iconAnchor: [18, 36] 
+    });
+
+    // Initialize map
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { 
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO', 
+      maxZoom: 20 
+    }).addTo(map);
+
+    // Pusher initialization
+    if (!PUSHER_KEY || PUSHER_KEY === "YOUR_PUBLIC_PUSHER_KEY") {
+      showError("ERROR: Pusher Key is not set in index.html.");
+    } else {
+      initializePusher();
+    }
+
+    function initializePusher() {
+      const pusher = new Pusher(PUSHER_KEY, { cluster: PUSHER_CLUSTER });
+      const channel = pusher.subscribe('booking-channel');
+      
+      channel.bind('driver-assigned', function(data) {
+        console.log("Pusher event received: driver-assigned", data);
+        showDriverAssigned(data);
+      });
+    }
+
+    function showDriverAssigned(data) {
+      statusEl.innerHTML = `
+        <div style="text-align: left; background: #e0f2fe; padding: 10px; border-radius: 8px;">
+          <strong style="color: #0c4a6e;">Driver Found!</strong><br>
+          Name: ${data.name}<br>
+          Vehicle: ${data.vehicle}<br>
+          ETA: ${data.eta}
+        </div>
+      `;
+      
+      const driverLatLng = [data.lat, data.lon];
+      
+      if (assignedDriverMarker) {
+        assignedDriverMarker.setLatLng(driverLatLng);
+      } else {
+        assignedDriverMarker = L.marker(driverLatLng, { icon: driverIcon }).addTo(map);
+        assignedDriverMarker.driverId = data.id;
+      }
+      
+      assignedDriverMarker.bindPopup(`Your driver: ${data.name}`).openPopup();
+      map.setView(driverLatLng, 16);
+    }
+
+    // Initialize booking features
+    function initBookingFeatures() {
+      useLocationBtn.addEventListener('click', handleUseLocation);
+      bookingForm.addEventListener("submit", handleFormSubmit);
+      modalConfirmBtn.addEventListener("click", handleConfirmBooking);
+      modalCancelBtn.addEventListener("click", closeModal);
+      modalCloseBtn.addEventListener("click", closeModal);
+      
+      // Set up autocomplete for both inputs
+      setAutocomplete(pickupInput);
+      setAutocomplete(destinationInput);
+      
+      // Fetch available drivers periodically
+      fetchAvailableDrivers();
+      setInterval(fetchAvailableDrivers, 30000);
+      
+      // Set up modal accessibility
+      modal.addEventListener('keydown', trapModalFocus);
+    }
+
+    // Handle geolocation button click
+    function handleUseLocation() {
+      if (!navigator.geolocation) {
+        showError("Geolocation is not supported by your browser.");
+        return;
+      }
+      
+      setLoading(useLocationBtn, true);
+      updateStatus("Locating your position...");
+      
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          const { latitude, longitude } = position.coords;
+          pickupLatLng = [latitude, longitude];
+          pickupInput.value = "Current Location";
+          updateBookingButton();
+          updateMapMarkersAndRoute();
+          map.setView(pickupLatLng, 15);
+          updateStatus("Location detected. Choose your destination.");
+          setLoading(useLocationBtn, false);
+        },
+        error => {
+          let message = "Unable to retrieve your location";
+          if (error.code === error.PERMISSION_DENIED) {
+            message = "Location permission denied. Please enable in browser settings.";
+          } else if (error.code === error.TIMEOUT) {
+            message = "Location request timed out. Please try again.";
+          }
+          showError(message);
+          setLoading(useLocationBtn, false);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    // Handle form submission
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      
+      if (!validateForm()) {
+        return;
+      }
+      
+      modalPickupAddress.textContent = pickupInput.value;
+      modalDestinationAddress.textContent = destinationInput.value;
+      modalFare.textContent = estimatedFareGlobal ? `₱${estimatedFareGlobal.toFixed(2)}` : "Calculating...";
+      openModal();
+      bookBtn.disabled = true;
+    }
+
+    // Validate form inputs
+    function validateForm() {
+      let isValid = true;
+      
+      // Validate pickup
+      if (!pickupInput.value.trim() || !pickupLatLng) {
+        pickupInput.classList.add('error');
+        pickupError.style.display = 'block';
+        isValid = false;
+      } else {
+        pickupInput.classList.remove('error');
+        pickupError.style.display = 'none';
+      }
+      
+      // Validate destination
+      if (!destinationInput.value.trim() || !destinationLatLng) {
+        destinationInput.classList.add('error');
+        destinationError.style.display = 'block';
+        isValid = false;
+      } else {
+        destinationInput.classList.remove('error');
+        destinationError.style.display = 'none';
+      }
+      
+      return isValid;
+    }
+
+    // Handle booking confirmation
+    async function handleConfirmBooking() {
+      setLoading(modalConfirmBtn, true);
+      updateStatus("Requesting your ride...");
+      
+      const bookingDetails = {
+        pickup: {
+          address: pickupInput.value,
+          lat: pickupLatLng[0],
+          lon: pickupLatLng[1]
+        },
+        destination: {
+          address: destinationInput.value,
+          lat: destinationLatLng[0],
+          lon: destinationLatLng[1]
+        },
+        estimatedFare: estimatedFareGlobal
+      };
+      
+      try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+        const response = await fetch(`${API_BASE_URL}/bookings`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken
+          },
+          body: JSON.stringify(bookingDetails)
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(result.message || "Booking failed.");
+        }
+        
+        updateStatus(result.message);
+        closeModal();
+      } catch (error) {
+        showError(`Error: ${error.message}`);
+      } finally {
+        setLoading(modalConfirmBtn, false);
+      }
+    }
+
+    // Fetch available drivers
+    async function fetchAvailableDrivers() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/drivers`);
+        
+        if (!response.ok) {
+          throw new Error("Failed to fetch drivers");
+        }
+        
+        const drivers = await response.json();
+        updateDriverMarkers(drivers);
+      } catch (error) {
+        console.error("Error fetching drivers:", error);
+      }
+    }
+
+    // Update driver markers on map
+    function updateDriverMarkers(drivers) {
+      const existingDriverIds = Object.keys(driverMarkers);
+      const incomingDriverIds = drivers.map(d => d.id);
+      
+      drivers.forEach(driver => {
+        // Skip if this is our assigned driver
+        if (assignedDriverMarker && driver.id === assignedDriverMarker.driverId) return;
+        
+        const latLng = [driver.lat, driver.lon];
+        
+        if (driverMarkers[driver.id]) {
+          driverMarkers[driver.id].setLatLng(latLng);
+        } else {
+          driverMarkers[driver.id] = L.marker(latLng, { icon: driverIcon })
+            .addTo(map)
+            .bindPopup(`Driver ${driver.id}`);
+        }
+      });
+      
+      // Remove drivers that are no longer available
+      existingDriverIds.forEach(id => {
+        if (!incomingDriverIds.includes(id)) {
+          map.removeLayer(driverMarkers[id]);
+          delete driverMarkers[id];
+        }
+      });
+    }
+
+    // Set up autocomplete for an input field
+    function setAutocomplete(inputElem) {
+      let container = null;
+      let selectedItemIndex = -1;
+
+      const onInput = debounce(() => {
+        const val = inputElem.value.trim();
+        closeSuggestions();
+        
+        if (!val) return;
+        
+        // Check cache first
+        if (geocodeCache[val]) {
+          showSuggestions(geocodeCache[val]);
+          return;
+        }
+        
+        geocode(val, (results) => {
+          if (results.length === 0) return;
+          
+          // Cache results
+          geocodeCache[val] = results;
+          showSuggestions(results);
+        });
+      }, 300);
+
+      function showSuggestions(results) {
+        container = document.createElement("div");
+        container.setAttribute("class", "autocomplete-items");
+        inputElem.closest('.input-wrapper').appendChild(container);
+
+        results.forEach((item, index) => {
+          let div = document.createElement("div");
+          div.textContent = item.display_name;
+          div.dataset.index = index;
+          div.addEventListener("click", () => onSelect(item));
+          container.appendChild(div);
+        });
+      }
+
+      function onSelect(item) {
+        inputElem.value = item.display_name;
+        
+        if (inputElem.id === "pickup") {
+          pickupLatLng = [parseFloat(item.lat), parseFloat(item.lon)];
+        } else if (inputElem.id === "destination") {
+          destinationLatLng = [parseFloat(item.lat), parseFloat(item.lon)];
+        }
+        
+        closeSuggestions();
+        updateBookingButton();
+        updateMapMarkersAndRoute();
+      }
+
+      function closeSuggestions() {
+        if (container) {
+          container.remove();
+          container = null;
+        }
+        selectedItemIndex = -1;
+      }
+
+      // Handle keyboard navigation
+      inputElem.addEventListener("keydown", (e) => {
+        if (!container) return;
+        
+        const items = container.querySelectorAll("div");
+        
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          selectedItemIndex = (selectedItemIndex + 1) % items.length;
+          highlightItem(items);
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          selectedItemIndex = (selectedItemIndex - 1 + items.length) % items.length;
+          highlightItem(items);
+        } else if (e.key === "Enter" && selectedItemIndex >= 0) {
+          e.preventDefault();
+          items[selectedItemIndex].click();
+        } else if (e.key === "Escape") {
+          closeSuggestions();
+        }
+      });
+
+      function highlightItem(items) {
+        items.forEach((item, i) => {
+          item.classList.toggle("autocomplete-active", i === selectedItemIndex);
+          if (i === selectedItemIndex) {
+            item.scrollIntoView({ block: "nearest" });
+          }
+        });
+      }
+
+      // Add listeners
+      inputElem.addEventListener("input", onInput);
+      
+      // Close suggestions when clicking elsewhere
+      document.addEventListener("click", (e) => {
+        if (!inputElem.contains(e.target) {
+          closeSuggestions();
+        }
+      });
+    }
+
+    // Update map markers and route
+    function updateMapMarkersAndRoute() {
+      // Clear existing user markers
+      userMarkers.forEach((m) => map.removeLayer(m));
+      userMarkers = [];
+      
+      // Clear existing route
+      if (routeLayer) {
+        map.removeLayer(routeLayer);
+        routeLayer = null;
+      }
+      
+      // Add pickup marker if available
+      if (pickupLatLng) {
+        const pickupMarker = L.marker(pickupLatLng, { icon: pickupIcon })
+          .addTo(map)
+          .bindPopup("Pick-up")
+          .openPopup();
+        userMarkers.push(pickupMarker);
+      }
+      
+      // Add destination marker if available
+      if (destinationLatLng) {
+        const destMarker = L.marker(destinationLatLng, { icon: destinationIcon })
+          .addTo(map)
+          .bindPopup("Destination")
+          .openPopup();
+        userMarkers.push(destMarker);
+      }
+      
+      // Calculate route if both points are available
+      if (pickupLatLng && destinationLatLng) {
+        fetchRoute(pickupLatLng, destinationLatLng);
+      }
+    }
+
+    // Fetch route from OSRM
+    function fetchRoute(start, end) {
+      const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
+      
+      updateStatus("Calculating route and fare...");
+      
+      fetch(url)
+        .then(res => {
+          if (!res.ok) {
+            throw new Error(`Routing service responded with status: ${res.status}`);
+          }
+          return res.json();
+        })
+        .then(data => {
+          if (data.routes && data.routes.length > 0) {
+            const route = data.routes[0];
+            const coords = route.geometry.coordinates.map((c) => [c[1], c[0]]);
+            
+            // Remove existing route layer
+            if (routeLayer) map.removeLayer(routeLayer);
+            
+            // Add new route layer
+            routeLayer = L.polyline(coords, { 
+              color: "#dc2626", 
+              weight: 5, 
+              opacity: 0.8 
+            }).addTo(map);
+            
+            // Fit map to route bounds
+            map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+            
+            // Calculate fare
+            const distanceKm = route.distance / 1000;
+            const durationMinutes = route.duration / 60;
+            let distanceFare = 0;
+            
+            if (distanceKm > INITIAL_KM_COVERED) {
+              distanceFare = (distanceKm - INITIAL_KM_COVERED) * SUCCEEDING_KM_RATE;
+            }
+            
+            const timeFare = durationMinutes * PER_MINUTE_RATE;
+            let estimatedFare = BASE_FARE + distanceFare + timeFare;
+            estimatedFare = Math.max(estimatedFare, MINIMUM_FARE);
+            estimatedFare = Math.round(estimatedFare / 5) * 5; // Round to nearest 5
+            estimatedFareGlobal = estimatedFare;
+            
+            updateStatus(
+              `Route: ${distanceKm.toFixed(2)} km, ~${durationMinutes.toFixed(0)} mins. Fare: ₱${estimatedFare.toFixed(2)}`
+            );
+          } else {
+            updateStatus("Could not find a route. Please try different locations.");
+          }
+        })
+        .catch(error => {
+          console.error("Route fetching error:", error);
+          updateStatus("Error calculating route. Service may be unavailable.");
+        });
+    }
+
+    // Geocode using Nominatim
+    function geocode(query, callback) {
+      const viewbox = "116.0,21.0,127.0,4.0";
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=5&countrycodes=ph&bounded=1&viewbox=${viewbox}`;
+      
+      fetch(url)
+        .then((res) => res.json())
+        .then((data) => callback(data))
+        .catch(() => callback([]));
+    }
+
+    // Modal functions
+    function openModal() {
+      lastFocusedElement = document.activeElement;
+      modal.style.display = "flex";
+      modal.querySelector('div').focus();
+      
+      // Disable scrolling on body
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+      modal.style.display = "none";
+      bookBtn.disabled = false;
+      
+      // Restore scrolling
+      document.body.style.overflow = '';
+      
+      // Return focus to last focused element
+      if (lastFocusedElement) {
+        lastFocusedElement.focus();
+      }
+    }
+
+    function trapModalFocus(e) {
+      if (e.key !== 'Tab') return;
+      
+      const focusableElements = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      
+      if (e.shiftKey) {
+        if (document.activeElement === firstElement) {
+          lastElement.focus();
+          e.preventDefault();
+        }
+      } else {
+        if (document.activeElement === lastElement) {
+          firstElement.focus();
+          e.preventDefault();
+        }
+      }
+    }
+
+    // Utility functions
+    function debounce(func, wait) {
+      let timeout;
+      return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
+
+    function updateStatus(message) {
+      if (typeof message === 'string') {
+        statusEl.textContent = message;
+      } else {
+        statusEl.innerHTML = '';
+        statusEl.appendChild(message);
+      }
+    }
+
+    function showError(message) {
+      statusEl.innerHTML = `<span style="color: #ef4444;">${message}</span>`;
+    }
+
+    function updateBookingButton() {
+      bookBtn.disabled = !(pickupLatLng && destinationLatLng);
+    }
+
+    function setLoading(element, isLoading) {
+      if (isLoading) {
+        element.disabled = true;
+        if (element === modalConfirmBtn) {
+          confirmBtnText.innerHTML = '<span class="spinner"></span> Processing...';
+        } else if (element === useLocationBtn) {
+          element.innerHTML = '<i class="material-icons spin">refresh</i>';
+        } else {
+          bookBtnText.innerHTML = '<span class="spinner"></span> Loading...';
+        }
+      } else {
+        element.disabled = false;
+        if (element === modalConfirmBtn) {
+          confirmBtnText.textContent = 'Confirm & Book';
+        } else if (element === useLocationBtn) {
+          element.innerHTML = '<i class="material-icons">my_location</i>';
+        } else {
+          bookBtnText.textContent = 'Book Now';
+        }
+      }
+    }
+
+    // Initialize the application
+    initBookingFeatures();
+  })();
+</script>
+</body>
+</html>
