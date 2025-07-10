@@ -3,12 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PH Angkas Padala - Real-time GPS Tracking</title>
+  <title>PH Angkas Padala - Book & Track</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
-    /* Embedded CSS to avoid separate file */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body, #app { height: 100%; font-family: 'Inter', sans-serif; }
     body { display: flex; flex-direction: column; min-height: 100vh; }
@@ -35,6 +34,63 @@
       z-index: 1;
     }
     
+    /* Booking Panel */
+    #booking-panel {
+      position: absolute;
+      top: 80px;
+      right: 20px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 16px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      width: 300px;
+      max-width: 90%;
+    }
+    
+    #booking-panel h2 {
+      color: #dc2626;
+      margin-bottom: 12px;
+      font-size: 1.2rem;
+    }
+    
+    .form-group {
+      margin-bottom: 12px;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 4px;
+      font-weight: 600;
+      color: #334155;
+    }
+    
+    .form-group input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-family: 'Inter', sans-serif;
+    }
+    
+    #book-btn {
+      width: 100%;
+      padding: 10px;
+      background: #fbbf24;
+      color: #dc2626;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    
+    #book-btn:hover {
+      background: #dc2626;
+      color: white;
+    }
+    
+    /* Controls */
     #controls {
       position: absolute;
       bottom: 20px;
@@ -46,7 +102,7 @@
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
     }
     
-    button {
+    #trackBtn {
       background: #fbbf24;
       color: #dc2626;
       border: none;
@@ -59,7 +115,7 @@
       gap: 5px;
     }
     
-    button:hover {
+    #trackBtn:hover {
       background: #dc2626;
       color: white;
     }
@@ -93,6 +149,27 @@
   <div id="app">
     <main>
       <div id="map"></div>
+      
+      <!-- Booking Panel -->
+      <div id="booking-panel">
+        <h2>Book a Ride</h2>
+        <form id="booking-form">
+          <div class="form-group">
+            <label for="pickup">Pickup Location</label>
+            <input type="text" id="pickup" placeholder="Enter pickup address">
+          </div>
+          <div class="form-group">
+            <label for="destination">Destination</label>
+            <input type="text" id="destination" placeholder="Enter destination">
+          </div>
+          <button type="submit" id="book-btn">
+            <i class="material-icons">directions_bike</i>
+            Book Now
+          </button>
+        </form>
+      </div>
+      
+      <!-- GPS Controls -->
       <div id="controls">
         <button id="trackBtn">
           <i class="material-icons">my_location</i>
@@ -123,6 +200,7 @@
       const trackBtn = document.getElementById('trackBtn');
       const trackText = trackBtn.querySelector('span');
       const trackIcon = trackBtn.querySelector('i');
+      const bookingForm = document.getElementById('booking-form');
       
       // Tracking function
       function startTracking() {
@@ -147,6 +225,13 @@
                   <b>Your Location</b><br>
                   Accuracy: ${Math.round(accuracy)} meters
                 `).openPopup();
+                
+                // Auto-fill pickup location if empty
+                if (!document.getElementById('pickup').value) {
+                  reverseGeocode(latitude, longitude, (address) => {
+                    document.getElementById('pickup').value = address;
+                  });
+                }
               } else {
                 userMarker.setLatLng([latitude, longitude]);
                 userMarker.setPopupContent(`
@@ -188,6 +273,36 @@
         trackBtn.style.background = '#fbbf24';
         trackBtn.style.color = '#dc2626';
       }
+      
+      // Reverse geocode function
+      function reverseGeocode(lat, lng, callback) {
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+          .then(response => response.json())
+          .then(data => {
+            const address = data.display_name || "Current Location";
+            callback(address);
+          })
+          .catch(() => callback("Current Location"));
+      }
+      
+      // Handle booking form submission
+      bookingForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const pickup = document.getElementById('pickup').value;
+        const destination = document.getElementById('destination').value;
+        
+        if (!pickup || !destination) {
+          alert('Please enter both pickup and destination locations');
+          return;
+        }
+        
+        // In a real app, you would send this to your backend
+        alert(`Booking requested!\nFrom: ${pickup}\nTo: ${destination}`);
+        
+        // Reset form
+        bookingForm.reset();
+      });
       
       // Toggle tracking
       trackBtn.addEventListener('click', function() {
