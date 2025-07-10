@@ -3,75 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PH Angkas Padala</title>
-  <!-- Fallback to local CSS if CDN fails -->
-  <style>
-    body, html { 
-      margin: 0; 
-      padding: 0; 
-      height: 100%; 
-      font-family: Arial, sans-serif;
-    }
-    #map { 
-      height: 100%; 
-      background: #f0f0f0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-    #status {
-      padding: 20px;
-      background: white;
-      border-radius: 5px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-  </style>
+  <title>PH Angkas Padala - Customer</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
-  <div id="map">
-    <div id="status">Loading map, please wait...</div>
+  <header>
+    <div class="logo">
+      <i class="material-icons" aria-hidden="true">motorcycle</i>
+      <span>PH Angkas Padala</span>
+    </div>
+  </header>
+  <div id="app">
+    <div id="map-container">
+      <div id="map"></div>
+      <div id="booking-panel"></div>
+      <div id="controls"></div>
+      <div id="status"></div>
+    </div>
   </div>
-
-  <!-- Load Leaflet with fallback -->
   <script>
-    function loadScript(src, callback) {
-      const script = document.createElement('script');
-      script.src = src;
-      script.onload = callback;
-      script.onerror = function() {
-        document.getElementById('status').innerHTML = 
-          'Failed to load map library. Please try again later.';
-      };
-      document.head.appendChild(script);
-    }
-
-    function initMap() {
-      try {
-        const map = L.map('map').setView([14.5995, 120.9842], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
-        
-        L.marker([14.5995, 120.9842])
-          .addTo(map)
-          .bindPopup("PH Angkas Padala")
-          .openPopup();
-          
-        document.getElementById('status').style.display = 'none';
-      } catch (e) {
-        document.getElementById('status').innerHTML = 
-          'Error initializing map: ' + e.message;
-      }
-    }
-
-    // Try CDN first, then fallback
-    if (typeof L === 'undefined') {
-      loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', function() {
-        loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', initMap);
-      });
-    } else {
-      initMap();
-    }
+    window.APP_ROLE = 'customer';
+    // No driver id needed
   </script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>
