@@ -1,21 +1,46 @@
-const io = require('socket.io')(server);
+const express = require('express');
+const http = require('http');
+const cors = require('cors');
+const socketio = require('socket.io');
 
+const app = express();
+const server = http.createServer(app);
+
+// Enable CORS and JSON parsing
+app.use(cors());
+app.use(express.json());
+
+// Socket.IO setup
+const io = socketio(server, {
+  cors: {
+    origin: "http://localhost:3000", // Replace with your frontend URL
+    methods: ["GET", "POST"]
+  }
+});
+
+// Socket.IO connection handler
 io.on('connection', (socket) => {
-  console.log('New client connected');
-  
+  console.log('New driver connected:', socket.id);
+
   // Handle driver status updates
   socket.on('driver-status-change', (data) => {
-    // Broadcast to relevant parties (passengers, admin, etc.)
     io.emit('driver-status-updated', data);
   });
-  
+
   // Handle booking acceptance
   socket.on('accept-booking', (data) => {
-    // Process booking acceptance
     io.emit('booking-accepted', data);
   });
-  
+
   socket.on('disconnect', () => {
-    console.log('Client disconnected');
+    console.log('Driver disconnected:', socket.id);
   });
+});
+
+// Existing API routes
+app.use('/api', require('./routes/driverRoutes')); // Example
+
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
