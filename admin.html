@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PH Angkas Padala - Admin</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+  <header>
+    <div class="logo">
+      <i class="material-icons" aria-hidden="true">motorcycle</i>
+      <span>PH Angkas Padala - Admin Portal</span>
+    </div>
+  </header>
+  <div id="app">
+    <div id="map-container">
+      <div id="map"></div>
+      <div id="admin-dashboard"></div>
+      <div id="status"></div>
+    </div>
+  </div>
+  <script>
+    window.APP_ROLE = 'admin';
+  </script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
