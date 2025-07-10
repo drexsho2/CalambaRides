@@ -3,449 +3,75 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PH Angkas Padala - Complete System</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <title>PH Angkas Padala</title>
+  <!-- Fallback to local CSS if CDN fails -->
   <style>
-    /* Previous styles remain the same, add these new styles */
-    
-    /* Booking actions */
-    .booking-actions {
+    body, html { 
+      margin: 0; 
+      padding: 0; 
+      height: 100%; 
+      font-family: Arial, sans-serif;
+    }
+    #map { 
+      height: 100%; 
+      background: #f0f0f0;
       display: flex;
-      gap: 8px;
-      margin-top: 8px;
+      justify-content: center;
+      align-items: center;
     }
-    
-    .btn-delete {
-      background: #ef4444 !important;
-      color: white !important;
-      padding: 4px 8px;
-      font-size: 0.8rem;
-    }
-    
-    /* Reject button */
-    .btn-reject {
-      background: #ef4444 !important;
-      color: white !important;
-    }
-    
-    /* Enhanced autocomplete */
-    .autocomplete-items {
-      position: absolute;
-      border: 1px solid #cbd5e1;
-      z-index: 9999;
-      max-height: 180px;
-      overflow-y: auto;
-      border-radius: 8px;
-      box-shadow: 0 3px 12px rgba(0,0,0,0.15);
-      background-color: #fff;
-      top: 100%;
-      left: 0;
-      right: 0;
-      margin-top: 4px;
-    }
-    
-    .autocomplete-items div {
-      padding: 8px 12px;
-      cursor: pointer;
-      font-size: 0.95rem;
-      color: #334155;
-      border-bottom: 1px solid #f1f5f9;
-    }
-    
-    .autocomplete-items div:last-child {
-      border-bottom: none;
-    }
-    
-    .autocomplete-items div:hover {
-      background-color: #dc2626;
-      color: #fff;
-    }
-    
-    /* Loading indicator */
-    .loading {
-      display: inline-block;
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(0,0,0,0.1);
-      border-radius: 50%;
-      border-top-color: #dc2626;
-      animation: spin 1s ease-in-out infinite;
-    }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    #status {
+      padding: 20px;
+      background: white;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
   </style>
 </head>
 <body>
-  <!-- Previous HTML structure remains the same until the scripts -->
+  <div id="map">
+    <div id="status">Loading map, please wait...</div>
+  </div>
 
+  <!-- Load Leaflet with fallback -->
   <script>
-    // Update the handleBooking function to include destination detection
-    async function handleBooking(e) {
-      e.preventDefault();
-      
-      const pickup = document.getElementById('pickup').value;
-      const destination = document.getElementById('destination').value;
-      const vehicleType = document.getElementById('vehicle-type').value;
-      
-      if (!pickup || !destination) {
-        showStatus('Please enter both pickup and destination locations', 'error');
-        return;
-      }
-      
-      const bookBtn = document.getElementById('book-btn');
-      bookBtn.innerHTML = '<span class="spinner"></span> Finding Driver...';
-      bookBtn.disabled = true;
-      
-      // Get coordinates for fare calculation
+    function loadScript(src, callback) {
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = callback;
+      script.onerror = function() {
+        document.getElementById('status').innerHTML = 
+          'Failed to load map library. Please try again later.';
+      };
+      document.head.appendChild(script);
+    }
+
+    function initMap() {
       try {
-        const pickupCoords = await geocodeAddress(pickup);
-        const destCoords = await geocodeAddress(destination);
+        const map = L.map('map').setView([14.5995, 120.9842], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
         
-        if (!pickupCoords || !destCoords) {
-          throw new Error("Could not get coordinates for addresses");
-        }
-        
-        // Calculate distance and duration
-        const { distance, duration } = await calculateRoute(pickupCoords, destCoords);
-        
-        // Create booking object with accurate fare
-        const booking = {
-          id: Date.now().toString(),
-          pickup,
-          destination,
-          vehicleType,
-          fare: calculateFare(distance, duration, vehicleType),
-          status: 'pending',
-          timestamp: new Date().toISOString(),
-          customerLocation: userMarker ? userMarker.getLatLng() : pickupCoords,
-          progress: 0,
-          pickupCoords,
-          destCoords
-        };
-        
-        // Save booking to "database"
-        const bookings = JSON.parse(localStorage.getItem('angkasBookings'));
-        bookings.push(booking);
-        localStorage.setItem('angkasBookings', JSON.stringify(bookings));
-        
-        // Find nearest available driver
-        const assignedDriver = assignDriver(booking);
-        
-        if (assignedDriver) {
-          // Update booking status
-          booking.status = 'assigned';
-          booking.driverId = assignedDriver.id;
-          booking.driverName = assignedDriver.name;
-          booking.driverVehicle = assignedDriver.vehicle;
-          localStorage.setItem('angkasBookings', JSON.stringify(bookings));
+        L.marker([14.5995, 120.9842])
+          .addTo(map)
+          .bindPopup("PH Angkas Padala")
+          .openPopup();
           
-          showStatus(`Driver assigned: ${assignedDriver.name} (${assignedDriver.vehicle})`, 'success');
-          
-          // Simulate driver moving to pickup
-          simulateDriverMovement(assignedDriver.id, booking);
-        } else {
-          showStatus('No available drivers at the moment', 'error');
-        }
-      } catch (error) {
-        showStatus(`Error: ${error.message}`, 'error');
-      } finally {
-        bookBtn.innerHTML = '<i class="material-icons">directions_bike</i><span>Book Now</span>';
-        bookBtn.disabled = false;
+        document.getElementById('status').style.display = 'none';
+      } catch (e) {
+        document.getElementById('status').innerHTML = 
+          'Error initializing map: ' + e.message;
       }
     }
-    
-    // New function for accurate geocoding
-    async function geocodeAddress(address) {
-      if (address === "Current Location" && userMarker) {
-        return userMarker.getLatLng();
-      }
-      
-      try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`);
-        const data = await response.json();
-        
-        if (data && data.length > 0) {
-          return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-        }
-        return null;
-      } catch (error) {
-        console.error("Geocoding error:", error);
-        return null;
-      }
-    }
-    
-    // New function for route calculation
-    async function calculateRoute(start, end) {
-      try {
-        const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=false`);
-        const data = await response.json();
-        
-        if (data.routes && data.routes.length > 0) {
-          return {
-            distance: data.routes[0].distance / 1000, // Convert to km
-            duration: data.routes[0].duration / 60 // Convert to minutes
-          };
-        }
-        throw new Error("No route found");
-      } catch (error) {
-        console.error("Routing error:", error);
-        // Fallback to estimated values
-        return {
-          distance: 5 + Math.random() * 10,
-          duration: 10 + Math.random() * 20
-        };
-      }
-    }
-    
-    // Enhanced fare calculation
-    function calculateFare(distance, duration, vehicleType) {
-      const rates = fareRates[vehicleType];
-      const distanceFare = Math.max(0, distance - 2) * rates.perKm;
-      const timeFare = duration * rates.perMin;
-      let fare = rates.base + distanceFare + timeFare;
-      fare = Math.max(fare, rates.minFare);
-      return `₱${Math.round(fare / 5) * 5}`; // Round to nearest 5
-    }
-    
-    // Update the loadAdminData function to include booking deletion
-    function loadAdminData() {
-      const drivers = JSON.parse(localStorage.getItem('angkasDrivers'));
-      const bookings = JSON.parse(localStorage.getItem('angkasBookings'));
-      
-      // Display drivers (previous code remains the same)
-      
-      // Display bookings with delete option
-      const bookingsList = document.getElementById('bookings-list');
-      bookingsList.innerHTML = '';
-      
-      bookings.slice().reverse().forEach(booking => {
-        const bookingCard = document.createElement('div');
-        bookingCard.className = 'booking-card';
-        bookingCard.innerHTML = `
-          <h4>Booking #${booking.id.slice(-4)}</h4>
-          <p>From: ${booking.pickup}</p>
-          <p>To: ${booking.destination}</p>
-          <p>Fare: ${booking.fare}</p>
-          <p>Status: <span class="driver-status status-${booking.status.replace('_', '-')}">${booking.status.replace('_', ' ')}</span></p>
-          ${booking.driverName ? `<p>Driver: ${booking.driverName}</p>` : ''}
-          <div class="booking-actions">
-            <button class="control-btn btn-delete" data-booking="${booking.id}">
-              <i class="material-icons">delete</i> Delete
-            </button>
-          </div>
-        `;
-        bookingsList.appendChild(bookingCard);
+
+    // Try CDN first, then fallback
+    if (typeof L === 'undefined') {
+      loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', function() {
+        loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css', initMap);
       });
-      
-      // Add event listeners to delete buttons
-      document.querySelectorAll('.btn-delete').forEach(btn => {
-        btn.addEventListener('click', function() {
-          deleteBooking(this.getAttribute('data-booking'));
-        });
-      });
+    } else {
+      initMap();
     }
-    
-    // New function to delete bookings
-    function deleteBooking(bookingId) {
-      if (confirm('Are you sure you want to delete this booking?')) {
-        const bookings = JSON.parse(localStorage.getItem('angkasBookings'));
-        const updatedBookings = bookings.filter(b => b.id !== bookingId);
-        localStorage.setItem('angkasBookings', JSON.stringify(updatedBookings));
-        
-        // If this booking was assigned to a driver, free them up
-        const drivers = JSON.parse(localStorage.getItem('angkasDrivers'));
-        const assignedDriver = drivers.find(d => d.bookingId === bookingId);
-        if (assignedDriver) {
-          assignedDriver.status = 'available';
-          assignedDriver.bookingId = null;
-          localStorage.setItem('angkasDrivers', JSON.stringify(drivers));
-        }
-        
-        showStatus('Booking deleted successfully', 'success');
-        loadAdminData();
-      }
-    }
-    
-    // Update the loadDriverData function to include reject option
-    function loadDriverData() {
-      const drivers = JSON.parse(localStorage.getItem('angkasDrivers'));
-      const bookings = JSON.parse(localStorage.getItem('angkasBookings'));
-      const driver = drivers.find(d => d.id === currentDriverId);
-      
-      if (!driver) return;
-      
-      // Current assignment (previous code remains the same)
-      
-      // Display available bookings with accept/reject
-      const availableBookings = document.getElementById('available-bookings');
-      availableBookings.innerHTML = '';
-      
-      const pendingBookings = bookings.filter(b => b.status === 'pending');
-      
-      if (pendingBookings.length > 0) {
-        pendingBookings.slice().reverse().forEach(booking => {
-          const bookingCard = document.createElement('div');
-          bookingCard.className = 'booking-card';
-          bookingCard.innerHTML = `
-            <h4>Booking #${booking.id.slice(-4)}</h4>
-            <p>From: ${booking.pickup}</p>
-            <p>To: ${booking.destination}</p>
-            <p>Fare: ${booking.fare}</p>
-            <p>Distance: ${(booking.distance || '~3-10')} km</p>
-            ${driver.status === 'available' ? `
-              <div class="action-buttons">
-                <button class="control-btn accept-btn" data-booking="${booking.id}">
-                  <i class="material-icons">check</i> Accept
-                </button>
-                <button class="control-btn btn-reject" data-booking="${booking.id}">
-                  <i class="material-icons">close</i> Reject
-                </button>
-              </div>
-            ` : '<p>Not available to accept</p>'}
-          `;
-          availableBookings.appendChild(bookingCard);
-        });
-        
-        // Add event listeners to accept buttons
-        document.querySelectorAll('.accept-btn').forEach(btn => {
-          btn.addEventListener('click', function() {
-            acceptBooking(this.getAttribute('data-booking'));
-          });
-        });
-        
-        // Add event listeners to reject buttons
-        document.querySelectorAll('.btn-reject').forEach(btn => {
-          btn.addEventListener('click', function() {
-            rejectBooking(this.getAttribute('data-booking'));
-          });
-        });
-      } else {
-        availableBookings.innerHTML = '<p>No available bookings</p>';
-      }
-    }
-    
-    // New function to reject bookings
-    function rejectBooking(bookingId) {
-      const bookings = JSON.parse(localStorage.getItem('angkasBookings'));
-      const booking = bookings.find(b => b.id === bookingId);
-      
-      if (booking) {
-        booking.rejectedDrivers = booking.rejectedDrivers || [];
-        if (!booking.rejectedDrivers.includes(currentDriverId)) {
-          booking.rejectedDrivers.push(currentDriverId);
-          localStorage.setItem('angkasBookings', JSON.stringify(bookings));
-        }
-        showStatus('Booking rejected', 'info');
-        loadDriverData();
-      }
-    }
-    
-    // Update the assignDriver function to consider rejected drivers
-    function assignDriver(booking) {
-      const drivers = JSON.parse(localStorage.getItem('angkasDrivers'));
-      
-      // Filter available drivers not rejected for this booking
-      const availableDrivers = drivers.filter(d => 
-        d.status === 'available' && 
-        (!booking.rejectedDrivers || !booking.rejectedDrivers.includes(d.id))
-      );
-      
-      if (availableDrivers.length === 0) return null;
-      
-      // Find nearest driver (simple implementation - could be enhanced)
-      let nearestDriver = availableDrivers[0];
-      let minDistance = Infinity;
-      
-      if (booking.customerLocation) {
-        availableDrivers.forEach(driver => {
-          if (driver.location) {
-            const distance = Math.sqrt(
-              Math.pow(booking.customerLocation.lat - driver.location.lat, 2) +
-              Math.pow(booking.customerLocation.lng - driver.location.lng, 2)
-            );
-            if (distance < minDistance) {
-              minDistance = distance;
-              nearestDriver = driver;
-            }
-          }
-        });
-      }
-      
-      // Update driver status
-      nearestDriver.status = 'assigned';
-      nearestDriver.bookingId = booking.id;
-      localStorage.setItem('angkasDrivers', JSON.stringify(drivers));
-      
-      return nearestDriver;
-    }
-    
-    // Update the setAutocomplete function for address inputs
-    function setAutocomplete(inputElem) {
-      let container = null;
-      let selectedItemIndex = -1;
-      let currentSearch = '';
-
-      const onInput = debounce(async () => {
-        const val = inputElem.value.trim();
-        if (!val || val === currentSearch) return;
-        
-        currentSearch = val;
-        closeSuggestions();
-        
-        try {
-          const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(val)}&addressdetails=1&limit=5&countrycodes=ph`);
-          const results = await response.json();
-          
-          if (results.length === 0) return;
-          
-          container = document.createElement("div");
-          container.className = "autocomplete-items";
-          inputElem.parentNode.appendChild(container);
-
-          results.forEach((item, index) => {
-            const div = document.createElement("div");
-            div.textContent = item.display_name;
-            div.dataset.index = index;
-            div.addEventListener("click", () => onSelect(item));
-            container.appendChild(div);
-          });
-        } catch (error) {
-          console.error("Autocomplete error:", error);
-        }
-      }, 300);
-
-      function onSelect(item) {
-        inputElem.value = item.display_name;
-        closeSuggestions();
-        updateFareEstimate();
-      }
-
-      function closeSuggestions() {
-        if (container) {
-          container.remove();
-          container = null;
-        }
-        selectedItemIndex = -1;
-      }
-
-      // Keyboard navigation (previous implementation)
-      
-      // Add listeners
-      inputElem.addEventListener("input", onInput);
-      document.addEventListener("click", (e) => {
-        if (!inputElem.contains(e.target)) {
-          closeSuggestions();
-        }
-      });
-    }
-    
-    // Initialize autocomplete for address inputs
-    setAutocomplete(document.getElementById('pickup'));
-    setAutocomplete(document.getElementById('destination'));
   </script>
 </body>
 </html>
