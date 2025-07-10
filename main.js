@@ -1,25 +1,28 @@
-// main.js
-document.addEventListener('DOMContentLoaded', function() {
-  // Accept role and driverId from global variables passed in each HTML file
-  const currentUserRole = window.APP_ROLE;
-  const currentDriverId = window.DRIVER_ID || null;
-
-  // ... (rest of your initialization code)
-  // Replace ALL code instances of role-detection via URL
-  // with the variables above.
-  // E.g.,
-
-  if (currentUserRole === 'customer') {
-    document.getElementById('booking-panel').style.display = 'block';
-    document.getElementById('admin-dashboard').style.display = 'none';
-    document.getElementById('driver-dashboard').style.display = 'none';
-    // Show customer controls
-  } else if (currentUserRole === 'admin') {
-    enableAdminMode();
-  } else if (currentUserRole === 'driver') {
-    enableDriverMode(currentDriverId);
-  }
-
-  // The rest stays as in your original script.
-
-});
+if (currentUserRole === 'customer') {
+  document.getElementById('booking-panel').innerHTML = `
+    <h2><i class="material-icons">directions_bike</i> Book a Ride</h2>
+    <form id="booking-form">
+      <div class="form-group">
+        <label for="pickup">Pickup Location</label>
+        <input type="text" id="pickup" placeholder="Enter pickup address" required>
+      </div>
+      <div class="form-group">
+        <label for="destination">Destination</label>
+        <input type="text" id="destination" placeholder="Enter destination" required>
+      </div>
+      <div class="form-group">
+        <label for="vehicle-type">Vehicle Type</label>
+        <select id="vehicle-type">
+          <option value="standard">Standard Motorcycle</option>
+          <option value="premium">Premium Motorcycle</option>
+        </select>
+      </div>
+      <div id="fare-display">Estimated Fare: ₱0.00</div>
+      <button type="submit" id="book-btn">
+        <i class="material-icons">directions_bike</i>
+        <span>Book Now</span>
+      </button>
+    </form>
+  `;
+  // Also need to do: add listeners for booking-form, etc
+}
