@@ -4,29 +4,193 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PH Angkas Padala - Admin</title>
-  <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="shared/styles.css">
 </head>
 <body>
   <header>
     <div class="logo">
-      <i class="material-icons" aria-hidden="true">motorcycle</i>
-      <span>PH Angkas Padala - Admin Portal</span>
+      <i class="material-icons">admin_panel_settings</i>
+      <span>PH Angkas Padala - Admin</span>
     </div>
   </header>
-  <div id="app">
-    <div id="map-container">
-      <div id="map"></div>
-      <div id="admin-dashboard"></div>
-      <div id="status"></div>
+  
+  <div id="map-container">
+    <div id="map"></div>
+    
+    <div class="panel" style="top: 80px; left: 20px; width: 320px;">
+      <div class="dashboard-header">
+        <h2><i class="material-icons">group</i> Manage Drivers</h2>
+      </div>
+      
+      <form id="add-driver-form">
+        <div class="form-group">
+          <label for="driver-name">Driver Name</label>
+          <input type="text" id="driver-name" placeholder="Driver name" required>
+        </div>
+        <div class="form-group">
+          <label for="driver-vehicle">Vehicle</label>
+          <input type="text" id="driver-vehicle" placeholder="Vehicle details" required>
+        </div>
+        <button type="submit" class="btn" style="width: 100%;">
+          <i class="material-icons">person_add</i> Add Driver
+        </button>
+      </form>
+      
+      <h3 style="margin-top: 20px;"><i class="material-icons">list</i> Active Drivers</h3>
+      <div id="drivers-list"></div>
+      
+      <h3><i class="material-icons">assignment</i> Recent Bookings</h3>
+      <div id="bookings-list"></div>
     </div>
   </div>
-  <script>
-    window.APP_ROLE = 'admin';
-  </script>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="main.js"></script>
+  <script src="shared/scripts.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const map = initMap();
+      
+      // Load initial data
+      loadAdminData();
+      
+      // Handle form submission
+      document.getElementById('add-driver-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const name = document.getElementById('driver-name').value;
+        const vehicle = document.getElementById('driver-vehicle').value;
+        
+        if (!name || !vehicle) {
+          showStatus('Please fill all fields', 'error');
+          return;
+        }
+        
+        const drivers = DB.getDrivers();
+        drivers.push({
+          id: 'driver' + Date.now().toString(),
+          name,
+          vehicle,
+          status: 'available',
+          location: null
+        });
+        DB.saveDrivers(drivers);
+        
+        showStatus('Driver added successfully', 'success');
+        this.reset();
+        loadAdminData();
+      });
+      
+      function loadAdminData() {
+        const drivers = DB.getDrivers();
+        const bookings = DB.getBookings();
+        
+        // Display drivers
+        const driversList = document.getElementById('drivers-list');
+        driversList.innerHTML = '';
+        
+        drivers.forEach(driver => {
+          const card = document.createElement('div');
+          card.className = 'driver-card';
+          card.innerHTML = `
+            <h4>${driver.name}</h4>
+            <p>${driver.vehicle}</p>
+            <p>Status: <span class="status status-${driver.status}">${driver.status}</span></p>
+            ${driver.location ? `
+              <p>Location: ${driver.location.lat.toFixed(4)}, ${driver.location.lng.toFixed(4)}</p>
+            ` : '<p>Location: Unknown</p>'}
+            <div class="driver-actions">
+              <button class="btn btn-danger remove-driver" data-driver="${driver.id}">
+                <i class="material-icons">delete</i> Remove
+              </button>
+            </div>
+          `;
+          driversList.appendChild(card);
+        });
+        
+        // Add event listeners to remove buttons
+        document.querySelectorAll('.remove-driver').forEach(btn => {
+          btn.addEventListener('click', function() {
+            removeDriver(this.getAttribute('data-driver'));
+          });
+        });
+        
+        // Display bookings
+        const bookingsList = document.getElementById('bookings-list');
+        bookingsList.innerHTML = '';
+        
+        bookings.slice().reverse().forEach(booking => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.innerHTML = `
+            <h4>Booking #${booking.id.slice(-4)}</h4>
+            <p>From: ${booking.pickup}</p>
+            <p>To: ${booking.destination}</p>
+            <p>Status: <span class="status status-${booking.status}">${booking.status}</span></p>
+            ${booking.driverName ? `<p>Driver: ${booking.driverName}</p>` : ''}
+            <div class="booking-actions">
+              <button class="btn btn-danger delete-booking" data-booking="${booking.id}">
+                <i class="material-icons">delete</i> Delete
+              </button>
+            </div>
+          `;
+          bookingsList.appendChild(card);
+        });
+        
+        // Add event listeners to delete buttons
+        document.querySelectorAll('.delete-booking').forEach(btn => {
+          btn.addEventListener('click', function() {
+            deleteBooking(this.getAttribute('data-booking'));
+          });
+        });
+      }
+      
+      function removeDriver(driverId) {
+        if (confirm('Are you sure you want to remove this driver?')) {
+          const drivers = DB.getDrivers();
+          const updatedDrivers = drivers.filter(d => d.id !== driverId);
+          DB.saveDrivers(updatedDrivers);
+          
+          // If driver had an assignment, free up the booking
+          const bookings = DB.getBookings();
+          const assignedBooking = bookings.find(b => b.driverId === driverId && ['assigned', 'driver_arrived', 'in_progress'].includes(b.status));
+          if (assignedBooking) {
+            assignedBooking.status = 'pending';
+            assignedBooking.driverId = null;
+            assignedBooking.driverName = null;
+            DB.saveBookings(bookings);
+          }
+          
+          showStatus('Driver removed successfully', 'success');
+          loadAdminData();
+        }
+      }
+      
+      function deleteBooking(bookingId) {
+        if (confirm('Are you sure you want to delete this booking?')) {
+          const bookings = DB.getBookings();
+          const updatedBookings = bookings.filter(b => b.id !== bookingId);
+          DB.saveBookings(updatedBookings);
+          
+          // If booking was assigned, free up the driver
+          const deletedBooking = bookings.find(b => b.id === bookingId);
+          if (deletedBooking && deletedBooking.driverId) {
+            const drivers = DB.getDrivers();
+            const driver = drivers.find(d => d.id === deletedBooking.driverId);
+            if (driver) {
+              driver.status = 'available';
+              driver.bookingId = null;
+              DB.saveDrivers(drivers);
+            }
+          }
+          
+          showStatus('Booking deleted successfully', 'success');
+          loadAdminData();
+        }
+      }
+    });
+  </script>
 </body>
 </html>
